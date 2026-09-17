@@ -15,9 +15,9 @@ const PRICES = {
 };
 
 
-// =========================
-// FULLY
-// =========================
+// ======================================================
+// FULLY CLOUD
+// ======================================================
 
 async function fullyLoadURL(env, targetURL) {
 
@@ -31,36 +31,23 @@ throw new Error("Secrets Fully manquants");
 
 console.log("FULLY LOAD URL :", targetURL);
 
-const response = await fetch(
-FULLY_API_URL,
-{
-method: "POST",
+const apiUrl = new URL(FULLY_API_URL);
 
-headers: {
-"Content-Type": "application/json"
-},
+// API Fully Cloud en GET
+apiUrl.searchParams.set("apiemail", env.FULLY_EMAIL);
+apiUrl.searchParams.set("apikey", env.FULLY_API_KEY);
+apiUrl.searchParams.set("devid", env.FULLY_DEVICE_ID);
+apiUrl.searchParams.set("cmd", "loadURL");
+apiUrl.searchParams.set("url", targetURL);
 
-body: JSON.stringify({
-email: env.FULLY_EMAIL,
-apiKey: env.FULLY_API_KEY,
-deviceId: env.FULLY_DEVICE_ID,
-command: "loadURL",
-parameter: targetURL
-})
-}
-);
+const response = await fetch(apiUrl.toString(), {
+method: "GET"
+});
 
 const text = await response.text();
 
-console.log(
-"FULLY HTTP STATUS :",
-response.status
-);
-
-console.log(
-"FULLY RESPONSE :",
-text
-);
+console.log("FULLY HTTP STATUS :", response.status);
+console.log("FULLY RESPONSE :", text);
 
 if (!response.ok) {
 throw new Error(
@@ -72,15 +59,11 @@ return text;
 }
 
 
-// =========================
-// SUMUP - CREATION
-// =========================
+// ======================================================
+// SUMUP - CREATION DU PAIEMENT
+// ======================================================
 
-async function createSumUpCheckout(
-env,
-amount,
-reference
-) {
+async function createSumUpCheckout(env, amount, reference) {
 
 const response = await fetch(
 "https://api.sumup.com/v0.1/checkouts",
@@ -88,26 +71,15 @@ const response = await fetch(
 method: "POST",
 
 headers: {
-"Authorization":
-`Bearer ${env.SUMUP_API_KEY}`,
-
-"Content-Type":
-"application/json"
+Authorization: `Bearer ${env.SUMUP_API_KEY}`,
+"Content-Type": "application/json"
 },
 
 body: JSON.stringify({
-
-checkout_reference:
-reference,
-
-amount:
-amount,
-
-currency:
-"EUR",
-
-merchant_code:
-env.SUMUP_MERCHANT_CODE,
+checkout_reference: reference,
+amount: amount,
+currency: "EUR",
+merchant_code: env.SUMUP_MERCHANT_CODE,
 
 hosted_checkout: {
 enabled: true
@@ -115,13 +87,11 @@ enabled: true
 
 return_url:
 "https://borne-gaming.eloprati60.workers.dev/webhook"
-
 })
 }
 );
 
-const data =
-await response.json();
+const data = await response.json();
 
 console.log(
 "SUMUP CREATE RESPONSE :",
@@ -144,14 +114,11 @@ return data;
 }
 
 
-// =========================
-// SUMUP - VERIFICATION
-// =========================
+// ======================================================
+// SUMUP - VERIFICATION DU PAIEMENT
+// ======================================================
 
-async function getSumUpCheckout(
-env,
-checkoutId
-) {
+async function getSumUpCheckout(env, checkoutId) {
 
 const response = await fetch(
 `https://api.sumup.com/v0.1/checkouts/${encodeURIComponent(checkoutId)}`,
@@ -159,14 +126,13 @@ const response = await fetch(
 method: "GET",
 
 headers: {
-"Authorization":
+Authorization:
 `Bearer ${env.SUMUP_API_KEY}`
 }
 }
 );
 
-const data =
-await response.json();
+const data = await response.json();
 
 console.log(
 "SUMUP VERIFY RESPONSE :",
@@ -183,23 +149,25 @@ return data;
 }
 
 
-// =========================
-// DURABLE OBJECT
-// =========================
+// ======================================================
+// DURABLE OBJECT - TIMER DE SESSION
+// ======================================================
 
 export class SessionTimer extends DurableObject {
 
 async fetch(request) {
 
-const url =
-new URL(request.url);
+const url = new URL(request.url);
 
-if (
-url.pathname === "/start"
-) {
+
+// ----------------------------------------------
+// DEMARRER LE TIMER
+// ----------------------------------------------
+
+if (url.pathname === "/start") {
 
 // TEST : 1 minute
-// Après validation : 20 minutes
+// On passera à 20 ou 60 minutes ensuite.
 
 await this.ctx.storage.setAlarm(
 Date.now() + 60 * 1000
@@ -215,9 +183,11 @@ return new Response(
 }
 
 
-if (
-url.pathname === "/cancel"
-) {
+// ----------------------------------------------
+// ANNULER LE TIMER
+// ----------------------------------------------
+
+if (url.pathname === "/cancel") {
 
 await this.ctx.storage.deleteAlarm();
 
@@ -237,6 +207,10 @@ return new Response(
 }
 
 
+// ----------------------------------------------
+// FIN DU TIMER
+// ----------------------------------------------
+
 async alarm() {
 
 console.log(
@@ -245,6 +219,7 @@ console.log(
 
 try {
 
+// Retour à la page QR
 await fullyLoadURL(
 this.env,
 QR_URL
@@ -265,31 +240,22 @@ error.message
 }
 
 
-// =========================
-// WORKER
-// =========================
+// ======================================================
+// WORKER PRINCIPAL
+// ======================================================
 
 export default {
 
 async fetch(request, env) {
 
-const url =
-new URL(request.url);
-
-console.log(
-"REQUEST :",
-request.method,
-url.pathname
-);
+const url = new URL(request.url);
 
 
-// =========================
+// ==================================================
 // TEST GOOGLE
-// =========================
+// ==================================================
 
-if (
-url.pathname === "/test-google"
-) {
+if (url.pathname === "/test-google") {
 
 try {
 
@@ -319,13 +285,11 @@ status: 500
 }
 
 
-// =========================
+// ==================================================
 // TEST FC26
-// =========================
+// ==================================================
 
-if (
-url.pathname === "/test-fully"
-) {
+if (url.pathname === "/test-fully") {
 
 try {
 
@@ -355,19 +319,16 @@ status: 500
 }
 
 
-// =========================
+// ==================================================
 // TEST TIMER
-// =========================
+// ==================================================
 
-if (
-url.pathname === "/test-timer"
-) {
+if (url.pathname === "/test-timer") {
 
 try {
 
 const borne =
-url.searchParams.get("borne") ||
-"001";
+url.searchParams.get("borne") || "001";
 
 const timer =
 env.SESSION_TIMER.getByName(
@@ -402,13 +363,11 @@ status: 500
 }
 
 
-// =========================
-// ACCUEIL
-// =========================
+// ==================================================
+// PAGE PRINCIPALE
+// ==================================================
 
-if (
-url.pathname === "/"
-) {
+if (url.pathname === "/") {
 
 return new Response(
 "BORNE GAMING OK"
@@ -416,13 +375,11 @@ return new Response(
 }
 
 
-// =========================
+// ==================================================
 // PAIEMENT TEST
-// =========================
+// ==================================================
 
-if (
-url.pathname === "/paiement-test"
-) {
+if (url.pathname === "/paiement-test") {
 
 try {
 
@@ -458,13 +415,11 @@ status: 500
 }
 
 
-// =========================
-// PAIEMENT
-// =========================
+// ==================================================
+// CREATION D'UN PAIEMENT
+// ==================================================
 
-if (
-url.pathname === "/pay"
-) {
+if (url.pathname === "/pay") {
 
 try {
 
@@ -479,6 +434,10 @@ Number(
 url.searchParams.get("duree")
 );
 
+
+// ----------------------------------------------
+// VERIFICATIONS
+// ----------------------------------------------
 
 if (!borne) {
 
@@ -513,9 +472,23 @@ status: 400
 }
 
 
+// ----------------------------------------------
+// REFERENCE SUMUP
+// ----------------------------------------------
+
 const reference =
 `BORNE-${borne}-${jeu}-${duree}-${Date.now()}`;
 
+
+console.log(
+"CREATION CHECKOUT :",
+reference
+);
+
+
+// ----------------------------------------------
+// CREATION PAIEMENT
+// ----------------------------------------------
 
 const checkout =
 await createSumUpCheckout(
@@ -531,6 +504,10 @@ checkout.id
 );
 
 
+// ----------------------------------------------
+// REDIRECTION VERS SUMUP
+// ----------------------------------------------
+
 return Response.redirect(
 checkout.hosted_checkout_url,
 303
@@ -542,257 +519,3 @@ console.error(
 "PAY ERROR :",
 error
 );
-
-return new Response(
-`Erreur paiement : ${error.message}`,
-{
-status: 500
-}
-);
-}
-}
-
-
-// =========================
-// WEBHOOK / RETOUR SUMUP
-// =========================
-
-if (
-url.pathname === "/webhook"
-) {
-
-try {
-
-console.log(
-"WEBHOOK RECU :",
-request.method
-);
-
-
-let body = {};
-
-try {
-
-body =
-await request.json();
-
-} catch {
-
-console.log(
-"WEBHOOK : pas de JSON"
-);
-}
-
-
-const checkoutId =
-
-url.searchParams.get(
-"checkout_id"
-) ||
-
-url.searchParams.get(
-"id"
-) ||
-
-body.checkout_id ||
-
-body.id ||
-
-body.payload?.checkout_id ||
-
-body.payload?.id ||
-
-null;
-
-
-console.log(
-"WEBHOOK CHECKOUT ID :",
-checkoutId
-);
-
-
-if (!checkoutId) {
-
-return new Response(
-"Checkout ID absent",
-{
-status: 400
-}
-);
-}
-
-
-const checkout =
-await getSumUpCheckout(
-env,
-checkoutId
-);
-
-
-const status =
-String(
-checkout.status || ""
-).toUpperCase();
-
-
-console.log(
-"CHECKOUT STATUS :",
-status
-);
-
-
-if (
-status !== "PAID"
-) {
-
-return new Response(
-"Paiement non confirmé",
-{
-status: 200
-}
-);
-}
-
-
-const reference =
-
-checkout.checkout_reference ||
-
-checkout.reference ||
-
-body.checkout_reference ||
-
-"";
-
-
-console.log(
-"REFERENCE :",
-reference
-);
-
-
-const match =
-reference.match(
-/^BORNE-([^-]+)-([^-]+)-(\d+)-/
-);
-
-
-if (!match) {
-
-return new Response(
-"Référence borne invalide",
-{
-status: 400
-}
-);
-}
-
-
-const borne =
-match[1];
-
-const jeu =
-match[2];
-
-const duree =
-Number(match[3]);
-
-
-if (!GAMES[jeu]) {
-
-throw new Error(
-`Jeu invalide : ${jeu}`
-);
-}
-
-
-if (!PRICES[duree]) {
-
-throw new Error(
-`Durée invalide : ${duree}`
-);
-}
-
-
-// =========================
-// LANCEMENT FC26
-// =========================
-
-console.log(
-"LANCEMENT JEU..."
-);
-
-
-await fullyLoadURL(
-env,
-GAMES[jeu].url
-);
-
-
-console.log(
-"JEU LANCE"
-);
-
-
-// =========================
-// TIMER
-// =========================
-
-const timer =
-env.SESSION_TIMER.getByName(
-`borne-${borne}`
-);
-
-
-await timer.fetch(
-"https://session/start",
-{
-method: "POST"
-}
-);
-
-
-console.log(
-"TIMER DEMARRE"
-);
-
-
-return new Response(
-"OK"
-);
-
-} catch (error) {
-
-console.error(
-"WEBHOOK ERROR :",
-error.message
-);
-
-console.error(
-"WEBHOOK STACK :",
-error.stack
-);
-
-
-return new Response(
-`Erreur webhook : ${error.message}`,
-{
-status: 500
-}
-);
-}
-}
-
-
-// =========================
-// ROUTE INCONNUE
-// =========================
-
-return new Response(
-"Route inconnue",
-{
-status: 404
-}
-);
-}
-};
