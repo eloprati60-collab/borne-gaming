@@ -1,0 +1,16 @@
+{
+"durable_objects": {
+"bindings": [
+{
+"name": "SESSION_TIMER",
+"class_name": "SessionTimer"
+}
+]
+},
+"exports": {
+"SessionTimer": {
+"type": "durable-object",
+"storage": "sqlite"
+}
+}
+}
