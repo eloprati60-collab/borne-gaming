@@ -9,111 +9,235 @@
  */
 import { DurableObject } from "cloudflare:workers";
 
-const QR_PAGE =
-"https://testsrcodejeux.carrd.co/?borne=001";
+const FULLY_API_URL = "https://api.fully-kiosk.com/remote/";
 
-const FC26_URL =
-"https://www.xbox.com/fr-FR/play/launch/ea-sports-fc-26-pour-xbox-series-x%7Cs/9P9FTXPKQ35P";
+const QR_URL = "https://testsrcodejeux.carrd.co/?borne=001";
 
-const FULLY_API_URL =
-"https://api.fully-kiosk.com/remote/";
+const GAMES = {
+fc26: {
+url: "https://www.xbox.com/fr-FR/play/launch/ea-sports-fc-26-pour-xbox-series-x%7Cs/9P9FTXPKQ35P"
+}
+};
+
+const PRICES = {
+20: 3,
+60: 5
+};
+
 
 // ======================================================
-// DURABLE OBJECT : MINUTEUR
+// DURABLE OBJECT : MINUTEUR DE SESSION
 // ======================================================
 
 export class SessionTimer extends DurableObject {
 
-async startSession() {
+async fetch(request) {
+const url = new URL(request.url);
 
-// 20 minutes = 1 200 000 millisecondes
-const endTime =
-Date.now() + 20 * 60 * 1000;
+if (url.pathname === "/start") {
 
-await this.ctx.storage.put(
-"sessionEnd",
-endTime
-);
-
+// TEST : retour au QR après 1 minute
 await this.ctx.storage.setAlarm(
-endTime
+Date.now() + 60 * 1000
 );
 
-return "Minuteur 20 minutes lancé";
+console.log("Session timer démarré : 1 minute");
+
+return new Response("Session timer started");
+}
+
+if (url.pathname === "/cancel") {
+
+await this.ctx.storage.deleteAlarm();
+
+console.log("Session timer annulé");
+
+return new Response("Session timer cancelled");
+}
+
+return new Response("SessionTimer OK");
 }
 
 async alarm() {
 
-const endTime =
-await this.ctx.storage.get("sessionEnd");
+try {
 
-if (!endTime) {
-return;
+console.log("Alarme déclenchée : retour au QR");
+
+await fullyLoadURL(
+this.env,
+QR_URL
+);
+
+console.log("Retour QR envoyé à Fully");
+
+} catch (error) {
+
+console.error(
+"Erreur retour QR :",
+error
+);
 }
-
-// Si l'alarme arrive trop tôt,
-// on la reprogramme.
-if (Date.now() < endTime) {
-
-await this.ctx.storage.setAlarm(
-endTime
-);
-
-return;
-}
-
-// ==============================================
-// RETOUR À LA PAGE QR
-// ==============================================
-
-const fullyUrl =
-new URL(FULLY_API_URL);
-
-fullyUrl.searchParams.set(
-"apiemail",
-this.env.FULLY_EMAIL
-);
-
-fullyUrl.searchParams.set(
-"apikey",
-this.env.FULLY_API_KEY
-);
-
-fullyUrl.searchParams.set(
-"devid",
-this.env.FULLY_DEVICE_ID
-);
-
-fullyUrl.searchParams.set(
-"cmd",
-"loadURL"
-);
-
-fullyUrl.searchParams.set(
-"url",
-QR_PAGE
-);
-
-const response =
-await fetch(
-fullyUrl.toString()
-);
-
-console.log(
-"Fin session - retour QR : " +
-response.status
-);
-
-// Nettoyage
-await this.ctx.storage.delete(
-"sessionEnd"
-);
 }
 }
 
 
 // ======================================================
-// WORKER PRINCIPAL
+// FONCTION FULLY KIOSK
+// ======================================================
+
+async function fullyLoadURL(env, url) {
+
+const email = env.FULLY_EMAIL;
+const apiKey = env.FULLY_API_KEY;
+const deviceId = env.FULLY_DEVICE_ID;
+
+if (!email || !apiKey || !deviceId) {
+throw new Error(
+"Secrets Fully manquants"
+);
+}
+
+const response = await fetch(
+FULLY_API_URL,
+{
+method: "POST",
+
+headers: {
+"Content-Type": "application/json"
+},
+
+body: JSON.stringify({
+email,
+apiKey,
+deviceId,
+command: "loadURL",
+parameter: url
+})
+}
+);
+
+const text = await response.text();
+
+console.log(
+"Réponse Fully :",
+text
+);
+
+if (!response.ok) {
+
+throw new Error(
+`Erreur Fully ${response.status}: ${text}`
+);
+}
+
+return text;
+}
+
+
+// ======================================================
+// SUMUP : CRÉATION DU CHECKOUT
+// ======================================================
+
+async function createSumUpCheckout(
+env,
+amount,
+reference
+) {
+
+const response = await fetch(
+"https://api.sumup.com/v0.1/checkouts",
+{
+method: "POST",
+
+headers: {
+"Authorization":
+`Bearer ${env.SUMUP_API_KEY}`,
+
+"Content-Type":
+"application/json"
+},
+
+body: JSON.stringify({
+checkout_reference:
+reference,
+
+amount:
+amount,
+
+currency:
+"EUR",
+
+merchant_code:
+env.SUMUP_MERCHANT_CODE,
+
+return_url:
+"https://borne-gaming.eloprati60.workers.dev/webhook"
+})
+}
+);
+
+const data =
+await response.json();
+
+console.log(
+"Réponse SumUp :",
+data
+);
+
+if (!response.ok) {
+
+throw new Error(
+`Erreur SumUp ${response.status}: ${JSON.stringify(data)}`
+);
+}
+
+return data;
+}
+
+
+// ======================================================
+// SUMUP : VÉRIFICATION DU PAIEMENT
+// ======================================================
+
+async function getSumUpCheckout(
+env,
+checkoutId
+) {
+
+const response = await fetch(
+`https://api.sumup.com/v0.1/checkouts/${checkoutId}`,
+{
+method: "GET",
+
+headers: {
+"Authorization":
+`Bearer ${env.SUMUP_API_KEY}`
+}
+}
+);
+
+const data =
+await response.json();
+
+console.log(
+"Vérification SumUp :",
+data
+);
+
+if (!response.ok) {
+
+throw new Error(
+`Erreur vérification SumUp ${response.status}: ${JSON.stringify(data)}`
+);
+}
+
+return data;
+}
+
+
+// ======================================================
+// ROUTES WORKER
 // ======================================================
 
 export default {
@@ -131,103 +255,65 @@ new URL(request.url);
 if (url.pathname === "/") {
 
 return new Response(
-"BORNE GAMING OK"
+"BORNE GAMING OK",
+{
+status: 200,
+
+headers: {
+"Content-Type":
+"text/plain; charset=utf-8"
+}
+}
 );
 }
 
 
 // ==================================================
-// TEST SUMUP 1 €
+// PAIEMENT TEST 1 €
 // ==================================================
 
-if (
-url.pathname === "/paiement-test" &&
-request.method === "GET"
-) {
+if (url.pathname === "/paiement-test") {
+
+try {
 
 const reference =
-"borne001-test-1euro-" +
-Date.now();
-
-const sumupResponse =
-await fetch(
-"https://api.sumup.com/v0.1/checkouts",
-{
-method: "POST",
-
-headers: {
-"Authorization":
-"Bearer " +
-env.SUMUP_API_KEY,
-
-"Content-Type":
-"application/json"
-},
-
-body: JSON.stringify({
-
-checkout_reference:
-reference,
-
-amount:
-1.00,
-
-currency:
-"EUR",
-
-merchant_code:
-env.SUMUP_MERCHANT_CODE,
-
-description:
-"TEST - Borne 001 - 1 euro",
-
-hosted_checkout: {
-enabled: true
-},
-
-return_url:
-"https://borne-gaming.eloprati60.workers.dev/webhook"
-})
-}
-);
-
-const result =
-await sumupResponse.text();
-
-if (!sumupResponse.ok) {
-
-return new Response(
-result,
-{
-status:
-sumupResponse.status,
-
-headers: {
-"Content-Type":
-"application/json"
-}
-}
-);
-}
+`TEST-${Date.now()}`;
 
 const checkout =
-JSON.parse(result);
+await createSumUpCheckout(
+env,
+1,
+reference
+);
 
 return Response.redirect(
-checkout.hosted_checkout_url,
-302
+checkout.checkout_url,
+303
 );
+
+} catch (error) {
+
+console.error(error);
+
+return new Response(
+`Erreur paiement test : ${error.message}`,
+{
+status: 500
+}
+);
+}
 }
 
 
 // ==================================================
-// VRAI PAIEMENT
+// CRÉATION DU PAIEMENT
+//
+// /pay?borne=001&jeu=fc26&duree=20
 // ==================================================
 
-if (
-url.pathname === "/pay" &&
-request.method === "GET"
-) {
+if (url.pathname === "/pay") {
+
+try {
 
 const borne =
 url.searchParams.get("borne");
@@ -236,269 +322,196 @@ const jeu =
 url.searchParams.get("jeu");
 
 const duree =
-url.searchParams.get("duree");
+Number(
+url.searchParams.get("duree")
+);
 
 
-if (
-!borne ||
-!jeu ||
-!duree
-) {
+// Vérification borne
+
+if (!borne) {
 
 return new Response(
-"Paramètres manquants : borne, jeu, duree",
-{ status: 400 }
+"Borne manquante",
+{
+status: 400
+}
 );
 }
 
 
-if (borne !== "001") {
+// Vérification jeu
+
+if (!GAMES[jeu]) {
 
 return new Response(
-"Borne inconnue",
-{ status: 400 }
+"Jeu invalide",
+{
+status: 400
+}
 );
 }
 
 
-if (jeu !== "fc26") {
+// Vérification durée
+
+if (!PRICES[duree]) {
 
 return new Response(
-"Jeu non disponible",
-{ status: 400 }
-);
+"Durée invalide",
+{
+status: 400
 }
-
-
-// Pour le moment :
-// UNIQUEMENT 20 MINUTES
-
-if (duree !== "20") {
-
-return new Response(
-"Pour le moment seule la durée 20 minutes est disponible.",
-{ status: 400 }
 );
 }
 
 
 const amount =
-3.00;
+PRICES[duree];
 
 
 const reference =
-`borne${borne}-${jeu}-${duree}min-${Date.now()}`;
-
-
-const sumupResponse =
-await fetch(
-"https://api.sumup.com/v0.1/checkouts",
-{
-method: "POST",
-
-headers: {
-"Authorization":
-"Bearer " +
-env.SUMUP_API_KEY,
-
-"Content-Type":
-"application/json"
-},
-
-body: JSON.stringify({
-
-checkout_reference:
-reference,
-
-amount:
-amount,
-
-currency:
-"EUR",
-
-merchant_code:
-env.SUMUP_MERCHANT_CODE,
-
-description:
-`Borne ${borne} - FC26 - 20 min`,
-
-hosted_checkout: {
-enabled: true
-},
-
-return_url:
-"https://borne-gaming.eloprati60.workers.dev/webhook"
-})
-}
-);
-
-
-const result =
-await sumupResponse.text();
-
-
-if (!sumupResponse.ok) {
-
-return new Response(
-result,
-{
-status:
-sumupResponse.status,
-
-headers: {
-"Content-Type":
-"application/json"
-}
-}
-);
-}
+`BORNE-${borne}-${jeu}-${duree}-${Date.now()}`;
 
 
 const checkout =
-JSON.parse(result);
+await createSumUpCheckout(
+env,
+amount,
+reference
+);
 
 
 return Response.redirect(
-checkout.hosted_checkout_url,
-302
+checkout.checkout_url,
+303
 );
+
+} catch (error) {
+
+console.error(error);
+
+return new Response(
+`Erreur création paiement : ${error.message}`,
+{
+status: 500
+}
+);
+}
 }
 
 
 // ==================================================
-// WEBHOOK SUMUP
+// WEBHOOK / RETOUR SUMUP
 // ==================================================
 
-if (
-url.pathname === "/webhook" &&
-request.method === "POST"
-) {
+if (url.pathname === "/webhook") {
 
 try {
 
-const data =
+let checkoutId =
+url.searchParams.get(
+"checkout_id"
+);
+
+
+// Tentative récupération depuis
+// le corps JSON
+
+if (!checkoutId) {
+
+try {
+
+const body =
 await request.json();
 
+checkoutId =
+body.checkout_id ||
+body.id ||
+null;
 
-console.log(
-"Webhook SumUp reçu"
-);
+} catch (_) {
 
-
-if (
-data.event_type &&
-data.event_type !==
-"CHECKOUT_STATUS_CHANGED"
-) {
-
-return new Response(
-null,
-{ status: 204 }
-);
+// Aucun JSON
 }
-
-
-const checkoutId =
-data.id;
+}
 
 
 if (!checkoutId) {
 
-console.log(
-"Webhook sans ID de checkout"
-);
-
 return new Response(
-null,
-{ status: 204 }
-);
-}
-
-
-// ==========================================
-// VÉRIFICATION DU PAIEMENT CHEZ SUMUP
-// ==========================================
-
-const checkoutResponse =
-await fetch(
-`https://api.sumup.com/v0.1/checkouts/${checkoutId}`,
+"checkout_id manquant",
 {
-method: "GET",
-
-headers: {
-"Authorization":
-"Bearer " +
-env.SUMUP_API_KEY
+status: 400
 }
-}
-);
-
-
-const checkoutText =
-await checkoutResponse.text();
-
-
-if (!checkoutResponse.ok) {
-
-console.log(
-"Erreur vérification checkout SumUp"
-);
-
-return new Response(
-null,
-{ status: 500 }
 );
 }
 
+
+// ----------------------------------------------
+// Vérification du paiement auprès de SumUp
+// ----------------------------------------------
 
 const checkout =
-JSON.parse(checkoutText);
+await getSumUpCheckout(
+env,
+checkoutId
+);
+
+
+console.log(
+"Checkout vérifié :",
+JSON.stringify(checkout)
+);
+
+
+// ----------------------------------------------
+// Vérification statut
+// ----------------------------------------------
+
+const status =
+String(
+checkout.status || ""
+).toUpperCase();
 
 
 if (
-checkout.status !== "PAID"
+status !== "PAID" &&
+status !== "SUCCESSFUL"
 ) {
 
-console.log(
-"Paiement non confirmé : " +
-checkout.status
-);
-
 return new Response(
-null,
-{ status: 204 }
+`Paiement non confirmé : ${status}`,
+{
+status: 400
+}
 );
 }
 
 
-console.log(
-"PAIEMENT CONFIRME"
-);
-
-
-// ==========================================
-// RÉCUPÉRATION DES INFOS
-// ==========================================
+// ----------------------------------------------
+// Récupération référence
+// ----------------------------------------------
 
 const reference =
-checkout.checkout_reference || "";
+checkout.checkout_reference ||
+checkout.reference ||
+"";
 
 
 const match =
 reference.match(
-/^borne(\d+)-([a-z0-9]+)-(\d+)min-(\d+)$/
+/^BORNE-([^-]+)-([^-]+)-(\d+)-/
 );
 
 
 if (!match) {
 
-console.log(
-"Référence inconnue"
-);
-
 return new Response(
-null,
-{ status: 204 }
+"Référence paiement invalide",
+{
+status: 400
+}
 );
 }
 
@@ -510,133 +523,112 @@ const jeu =
 match[2];
 
 const duree =
-match[3];
+Number(match[3]);
 
 
-if (borne !== "001") {
+// ----------------------------------------------
+// Vérification jeu
+// ----------------------------------------------
+
+if (!GAMES[jeu]) {
 
 return new Response(
-null,
-{ status: 204 }
+"Jeu invalide",
+{
+status: 400
+}
 );
 }
 
 
-if (jeu !== "fc26") {
+// ----------------------------------------------
+// Vérification durée
+// ----------------------------------------------
+
+if (!PRICES[duree]) {
 
 return new Response(
-null,
-{ status: 204 }
+"Durée invalide",
+{
+status: 400
+}
 );
 }
 
 
-if (duree !== "20") {
+// ----------------------------------------------
+// LANCEMENT DU JEU
+// ----------------------------------------------
 
-return new Response(
-null,
-{ status: 204 }
-);
-}
-
-
-// ==========================================
-// LANCEMENT FC26
-// ==========================================
-
-const fullyUrl =
-new URL(FULLY_API_URL);
+const gameURL =
+GAMES[jeu].url;
 
 
-fullyUrl.searchParams.set(
-"apiemail",
-env.FULLY_EMAIL
-);
-
-
-fullyUrl.searchParams.set(
-"apikey",
-env.FULLY_API_KEY
-);
-
-
-fullyUrl.searchParams.set(
-"devid",
-env.FULLY_DEVICE_ID
-);
-
-
-fullyUrl.searchParams.set(
-"cmd",
-"loadURL"
-);
-
-
-fullyUrl.searchParams.set(
-"url",
-FC26_URL
-);
-
-
-const fullyResponse =
-await fetch(
-fullyUrl.toString()
+await fullyLoadURL(
+env,
+gameURL
 );
 
 
 console.log(
-"FC26 envoyé à la borne " +
-borne +
-" : " +
-fullyResponse.status
+`Jeu lancé : ${jeu} sur borne ${borne}`
 );
 
 
-if (!fullyResponse.ok) {
+// ----------------------------------------------
+// DÉMARRAGE DU TIMER
+// ----------------------------------------------
 
-return new Response(
-null,
-{ status: 500 }
+const timerNamespace =
+env.SESSION_TIMER;
+
+
+if (!timerNamespace) {
+
+throw new Error(
+"SESSION_TIMER binding manquant"
 );
 }
 
 
-// ==========================================
-// LANCEMENT DU MINUTEUR 20 MIN
-// ==========================================
-
 const timer =
-env.SESSION_TIMER.getByName(
-"borne-" + borne
+timerNamespace.getByName(
+`borne-${borne}`
 );
 
 
 await timer.fetch(
-"https://session/start"
+"https://session/start",
+{
+method: "POST"
+}
 );
 
 
 console.log(
-"Minuteur 20 minutes lancé"
+`Timer démarré pour borne ${borne}`
 );
 
 
 return new Response(
-null,
-{ status: 204 }
+"Paiement confirmé - jeu lancé - minuteur démarré",
+{
+status: 200
+}
 );
-
 
 } catch (error) {
 
-console.log(
-"Erreur webhook : " +
-error.message
+console.error(
+"Erreur webhook :",
+error
 );
 
 return new Response(
-null,
-{ status: 500 }
+`Erreur webhook : ${error.message}`,
+{
+status: 500
+}
 );
 }
 }
@@ -646,73 +638,42 @@ null,
 // TEST DIRECT FULLY
 // ==================================================
 
-if (
-url.pathname === "/test-fully" &&
-request.method === "GET"
-) {
+if (url.pathname === "/test-fully") {
 
-const fullyUrl =
-new URL(FULLY_API_URL);
+try {
 
-
-fullyUrl.searchParams.set(
-"apiemail",
-env.FULLY_EMAIL
+await fullyLoadURL(
+env,
+GAMES.fc26.url
 );
-
-
-fullyUrl.searchParams.set(
-"apikey",
-env.FULLY_API_KEY
-);
-
-
-fullyUrl.searchParams.set(
-"devid",
-env.FULLY_DEVICE_ID
-);
-
-
-fullyUrl.searchParams.set(
-"cmd",
-"loadURL"
-);
-
-
-fullyUrl.searchParams.set(
-"url",
-FC26_URL
-);
-
-
-const response =
-await fetch(
-fullyUrl.toString()
-);
-
-
-const result =
-await response.text();
-
 
 return new Response(
-result,
-{
-status:
-response.status,
+"FC26 lancé avec succès"
+);
 
-headers: {
-"Content-Type":
-"text/plain"
-}
+} catch (error) {
+
+console.error(error);
+
+return new Response(
+`Erreur Fully : ${error.message}`,
+{
+status: 500
 }
 );
 }
+}
 
+
+// ==================================================
+// ROUTE INCONNUE
+// ==================================================
 
 return new Response(
 "Route inconnue",
-{ status: 404 }
+{
+status: 404
+}
 );
 }
 };
