@@ -15,9 +15,9 @@ const PRICES = {
 };
 
 
-// ================================
+// ========================================
 // DURABLE OBJECT : TIMER
-// ================================
+// ========================================
 
 export class SessionTimer extends DurableObject {
 
@@ -25,50 +25,37 @@ async fetch(request) {
 
 const url = new URL(request.url);
 
-// Démarrer le timer
 if (url.pathname === "/start") {
 
 // TEST : 1 minute
-// Plus tard, on remettra 20 minutes
+// Après validation : 20 minutes
 await this.ctx.storage.setAlarm(
 Date.now() + 60 * 1000
 );
 
-console.log("Timer démarré : 1 minute");
+console.log("TIMER START : 1 minute");
 
-return new Response(
-"Session timer started"
-);
+return new Response("Timer started");
 }
 
-
-// Annuler le timer
 if (url.pathname === "/cancel") {
 
 await this.ctx.storage.deleteAlarm();
 
-console.log("Timer annulé");
+console.log("TIMER CANCEL");
 
-return new Response(
-"Session timer cancelled"
-);
+return new Response("Timer cancelled");
+}
+
+return new Response("SessionTimer OK");
 }
 
 
-return new Response(
-"SessionTimer OK"
-);
-}
-
-
-// Quand le timer arrive à zéro
 async alarm() {
 
-try {
+console.log("TIMER ALARM : session terminée");
 
-console.log(
-"Timer terminé : retour QR"
-);
+try {
 
 await fullyLoadURL(
 this.env,
@@ -76,38 +63,38 @@ QR_URL
 );
 
 console.log(
-"Retour QR envoyé à Fully"
+"TIMER ALARM : retour QR envoyé"
 );
 
 } catch (error) {
 
 console.error(
-"Erreur retour QR :",
-error
+"TIMER ALARM ERROR :",
+error.message
 );
 }
 }
 }
 
 
-// ================================
-// FONCTION FULLY KIOSK
-// ================================
+// ========================================
+// FULLY KIOSK
+// ========================================
 
-async function fullyLoadURL(env, url) {
+async function fullyLoadURL(env, targetURL) {
 
 const email = env.FULLY_EMAIL;
 const apiKey = env.FULLY_API_KEY;
 const deviceId = env.FULLY_DEVICE_ID;
 
-
 if (!email || !apiKey || !deviceId) {
-
-throw new Error(
-"Secrets Fully manquants"
-);
+throw new Error("Secrets Fully manquants");
 }
 
+console.log(
+"FULLY LOAD URL :",
+targetURL
+);
 
 const response = await fetch(
 FULLY_API_URL,
@@ -119,44 +106,37 @@ headers: {
 },
 
 body: JSON.stringify({
-
 email,
 apiKey,
 deviceId,
-
 command: "loadURL",
-
-parameter: url
+parameter: targetURL
 })
 }
 );
 
-
 const text =
 await response.text();
 
-
 console.log(
-"Réponse Fully :",
+"FULLY RESPONSE :",
 text
 );
-
 
 if (!response.ok) {
 
 throw new Error(
-`Erreur Fully ${response.status}: ${text}`
+`Fully HTTP ${response.status} : ${text}`
 );
 }
-
 
 return text;
 }
 
 
-// ================================
-// CRÉATION PAIEMENT SUMUP
-// ================================
+// ========================================
+// SUMUP : CREER CHECKOUT
+// ========================================
 
 async function createSumUpCheckout(
 env,
@@ -164,13 +144,18 @@ amount,
 reference
 ) {
 
+console.log(
+"SUMUP CREATE :",
+amount,
+reference
+);
+
 const response = await fetch(
 "https://api.sumup.com/v0.1/checkouts",
 {
 method: "POST",
 
 headers: {
-
 "Authorization":
 `Bearer ${env.SUMUP_API_KEY}`,
 
@@ -202,87 +187,82 @@ return_url:
 }
 );
 
-
 const data =
 await response.json();
 
-
 console.log(
-"Réponse SumUp :",
-data
+"SUMUP CREATE RESPONSE :",
+JSON.stringify(data)
 );
-
 
 if (!response.ok) {
 
 throw new Error(
-`Erreur SumUp ${response.status}: ${JSON.stringify(data)}`
+`SumUp create HTTP ${response.status} : ${JSON.stringify(data)}`
 );
 }
-
 
 if (!data.hosted_checkout_url) {
 
 throw new Error(
-"SumUp n'a pas retourné hosted_checkout_url"
+"SumUp : hosted_checkout_url absent"
 );
 }
-
 
 return data;
 }
 
 
-// ================================
-// VÉRIFICATION PAIEMENT SUMUP
-// ================================
+// ========================================
+// SUMUP : VERIFIER CHECKOUT
+// ========================================
 
 async function getSumUpCheckout(
 env,
 checkoutId
 ) {
 
+console.log(
+"SUMUP VERIFY ID :",
+checkoutId
+);
+
 const response = await fetch(
 
-`https://api.sumup.com/v0.1/checkouts/${checkoutId}`,
+`https://api.sumup.com/v0.1/checkouts/${encodeURIComponent(checkoutId)}`,
 
 {
 method: "GET",
 
 headers: {
-
 "Authorization":
 `Bearer ${env.SUMUP_API_KEY}`
 }
 }
 );
 
-
 const data =
 await response.json();
 
-
 console.log(
-"Vérification SumUp :",
-data
+"SUMUP VERIFY RESPONSE :",
+JSON.stringify(data)
 );
-
 
 if (!response.ok) {
 
 throw new Error(
-`Erreur vérification SumUp ${response.status}: ${JSON.stringify(data)}`
+`SumUp verify HTTP ${response.status} : ${JSON.stringify(data)}`
 );
 }
-
 
 return data;
 }
 
 
-// ================================
-// WORKER PRINCIPAL
-// ================================
+// ========================================
+// WORKER
+// ========================================
 
 export default {
 
@@ -291,10 +271,16 @@ async fetch(request, env) {
 const url =
 new URL(request.url);
 
+console.log(
+"REQUEST :",
+request.method,
+url.pathname
+);
 
-// ============================
-// TEST WORKER
-// ============================
+
+// ====================================
+// TEST
+// ====================================
 
 if (url.pathname === "/") {
 
@@ -304,9 +290,9 @@ return new Response(
 }
 
 
-// ============================
+// ====================================
 // PAIEMENT TEST 1€
-// ============================
+// ====================================
 
 if (url.pathname === "/paiement-test") {
 
@@ -315,7 +301,6 @@ try {
 const reference =
 `TEST-${Date.now()}`;
 
-
 const checkout =
 await createSumUpCheckout(
 env,
@@ -323,22 +308,20 @@ env,
 reference
 );
 
-
 return Response.redirect(
 checkout.hosted_checkout_url,
 303
 );
 
-
 } catch (error) {
 
-console.error(error);
-
+console.error(
+"PAIEMENT TEST ERROR :",
+error
+);
 
 return new Response(
-
 `Erreur paiement test : ${error.message}`,
-
 {
 status: 500
 }
@@ -347,9 +330,9 @@ status: 500
 }
 
 
-// ============================
+// ====================================
 // PAIEMENT BORNE
-// ============================
+// ====================================
 
 if (url.pathname === "/pay") {
 
@@ -364,6 +347,14 @@ url.searchParams.get("jeu");
 const duree =
 Number(
 url.searchParams.get("duree")
+);
+
+
+console.log(
+"PAY REQUEST :",
+borne,
+jeu,
+duree
 );
 
 
@@ -416,21 +407,26 @@ reference
 );
 
 
+console.log(
+"CHECKOUT CREATED :",
+checkout.id
+);
+
+
 return Response.redirect(
 checkout.hosted_checkout_url,
 303
 );
 
-
 } catch (error) {
 
-console.error(error);
-
+console.error(
+"PAY ERROR :",
+error
+);
 
 return new Response(
-
-`Erreur création paiement : ${error.message}`,
-
+`Erreur paiement : ${error.message}`,
 {
 status: 500
 }
@@ -439,42 +435,78 @@ status: 500
 }
 
 
-// ============================
-// RETOUR / WEBHOOK SUMUP
-// ============================
+// ====================================
+// WEBHOOK SUMUP
+// ====================================
 
 if (url.pathname === "/webhook") {
 
 try {
 
-let checkoutId =
-url.searchParams.get(
-"checkout_id"
+console.log(
+"WEBHOOK RECU :",
+request.method
 );
 
 
-// Si SumUp envoie du JSON
-if (!checkoutId) {
+let body = {};
 
+// Lire le JSON si présent
 try {
 
-const body =
+body =
 await request.json();
 
+} catch (error) {
 
-checkoutId =
-body.checkout_id ||
-body.id ||
-null;
-
-} catch (_) {}
+console.log(
+"WEBHOOK : aucun JSON exploitable"
+);
 }
 
 
+console.log(
+"WEBHOOK BODY :",
+JSON.stringify(body)
+);
+
+
+// SumUp peut fournir l'ID sous différentes formes
+const checkoutId =
+
+url.searchParams.get(
+"checkout_id"
+) ||
+
+url.searchParams.get(
+"id"
+) ||
+
+body.checkout_id ||
+
+body.id ||
+
+body.payload?.checkout_id ||
+
+body.payload?.id ||
+
+null;
+
+
+console.log(
+"WEBHOOK CHECKOUT ID :",
+checkoutId
+);
+
+
 if (!checkoutId) {
 
+console.error(
+"WEBHOOK ERROR : checkout ID absent"
+);
+
 return new Response(
-"checkout_id manquant",
+"Webhook reçu mais checkout ID absent",
 {
 status: 400
 }
@@ -482,7 +514,10 @@ status: 400
 }
 
 
-// Vérifier le paiement
+// ==================================
+// VERIFICATION CHEZ SUMUP
+// ==================================
+
 const checkout =
 await getSumUpCheckout(
 env,
@@ -496,31 +531,48 @@ checkout.status || ""
 ).toUpperCase();
 
 
-if (
-status !== "PAID" &&
-status !== "SUCCESSFUL"
-) {
+console.log(
+"CHECKOUT STATUS :",
+status
+);
+
+
+// ==================================
+// PAIEMENT NON PAYE
+// ==================================
+
+if (status !== "PAID") {
+
+console.log(
+"PAIEMENT PAS ENCORE PAID :",
+status
+);
 
 return new Response(
-
-`Paiement non confirmé : ${status}`,
-
+"Webhook reçu - paiement non confirmé",
 {
-status: 400
+status: 200
 }
 );
 }
 
 
-// Récupérer la référence
+// ==================================
+// RECUPERER REFERENCE
+// ==================================
+
 const reference =
 checkout.checkout_reference ||
 checkout.reference ||
+body.checkout_reference ||
 "";
 
 
-// Exemple :
-// BORNE-001-fc26-20-123456
+console.log(
+"CHECKOUT REFERENCE :",
+reference
+);
+
 
 const match =
 reference.match(
@@ -530,10 +582,13 @@ reference.match(
 
 if (!match) {
 
+console.error(
+"REFERENCE INVALIDE :",
+reference
+);
+
 return new Response(
-
-"Référence paiement invalide",
-
+"Paiement OK mais référence borne invalide",
 {
 status: 400
 }
@@ -551,32 +606,42 @@ const duree =
 Number(match[3]);
 
 
-// Vérifications
+console.log(
+"SESSION :",
+borne,
+jeu,
+duree
+);
+
+
+// ==================================
+// VERIFICATIONS
+// ==================================
+
 if (!GAMES[jeu]) {
 
-return new Response(
-"Jeu invalide",
-{
-status: 400
-}
+throw new Error(
+`Jeu invalide : ${jeu}`
 );
 }
 
 
 if (!PRICES[duree]) {
 
-return new Response(
-"Durée invalide",
-{
-status: 400
-}
+throw new Error(
+`Durée invalide : ${duree}`
 );
 }
 
 
-// ========================
-// LANCER LE JEU
-// ========================
+// ==================================
+// LANCER FC26
+// ==================================
+
+console.log(
+"LANCEMENT JEU..."
+);
+
 
 await fullyLoadURL(
 env,
@@ -585,13 +650,13 @@ GAMES[jeu].url
 
 
 console.log(
-`Jeu ${jeu} lancé sur borne ${borne}`
+"JEU LANCE"
 );
 
 
-// ========================
-// RÉCUPÉRER LE TIMER
-// ========================
+// ==================================
+// TIMER
+// ==================================
 
 const timerNamespace =
 env.SESSION_TIMER;
@@ -611,14 +676,13 @@ timerNamespace.getByName(
 );
 
 
-// ========================
-// DÉMARRER LE TIMER
-// ========================
+console.log(
+"DEMARRAGE TIMER..."
+);
+
 
 await timer.fetch(
-
 "https://session/start",
-
 {
 method: "POST"
 }
@@ -626,14 +690,14 @@ method: "POST"
 
 
 console.log(
-`Timer démarré pour borne ${borne}`
+"TIMER DEMARRE"
 );
 
 
+// SumUp reçoit une confirmation
+// rapide du webhook
 return new Response(
-
-"Paiement confirmé - jeu lancé - timer démarré",
-
+"OK",
 {
 status: 200
 }
@@ -643,15 +707,18 @@ status: 200
 } catch (error) {
 
 console.error(
-"Erreur webhook :",
-error
+"WEBHOOK ERROR :",
+error.message
+);
+
+console.error(
+"WEBHOOK ERROR STACK :",
+error.stack
 );
 
 
 return new Response(
-
 `Erreur webhook : ${error.message}`,
-
 {
 status: 500
 }
@@ -660,9 +727,9 @@ status: 500
 }
 
 
-// ============================
+// ====================================
 // TEST FULLY
-// ============================
+// ====================================
 
 if (url.pathname === "/test-fully") {
 
@@ -673,21 +740,19 @@ env,
 GAMES.fc26.url
 );
 
-
 return new Response(
 "FC26 lancé avec succès"
 );
 
-
 } catch (error) {
 
-console.error(error);
-
+console.error(
+"TEST FULLY ERROR :",
+error
+);
 
 return new Response(
-
 `Erreur Fully : ${error.message}`,
-
 {
 status: 500
 }
@@ -696,9 +761,9 @@ status: 500
 }
 
 
-// ============================
+// ====================================
 // TEST TIMER SANS PAIEMENT
-// ============================
+// ====================================
 
 if (url.pathname === "/test-timer") {
 
@@ -728,9 +793,7 @@ timerNamespace.getByName(
 
 
 await timer.fetch(
-
 "https://session/start",
-
 {
 method: "POST"
 }
@@ -738,21 +801,18 @@ method: "POST"
 
 
 return new Response(
-
 `Timer démarré pour la borne ${borne}`
-
 );
-
 
 } catch (error) {
 
-console.error(error);
-
+console.error(
+"TEST TIMER ERROR :",
+error
+);
 
 return new Response(
-
 `Erreur timer : ${error.message}`,
-
 {
 status: 500
 }
@@ -761,9 +821,9 @@ status: 500
 }
 
 
-// ============================
+// ====================================
 // ROUTE INCONNUE
-// ============================
+// ====================================
 
 return new Response(
 "Route inconnue",
