@@ -1,12 +1,3 @@
-/**
- * Welcome to Cloudflare Workers! This is your first worker.
- *
- * - Run "npm run dev" in your terminal to start a development server
- * - Open a browser tab at http://localhost:8787/ to see your worker in action
- * - Run "npm run deploy" to publish your worker
- *
- * Learn more at https://developers.cloudflare.com/workers/
- */
 import { DurableObject } from "cloudflare:workers";
 
 const FULLY_API_URL = "https://api.fully-kiosk.com/remote/";
@@ -26,7 +17,7 @@ const PRICES = {
 
 
 // ======================================================
-// DURABLE OBJECT : MINUTEUR DE SESSION
+// DURABLE OBJECT : MINUTEUR
 // ======================================================
 
 export class SessionTimer extends DurableObject {
@@ -36,12 +27,12 @@ const url = new URL(request.url);
 
 if (url.pathname === "/start") {
 
-// TEST : retour au QR après 1 minute
+// TEST : 1 minute
 await this.ctx.storage.setAlarm(
 Date.now() + 60 * 1000
 );
 
-console.log("Session timer démarré : 1 minute");
+console.log("Timer démarré : 1 minute");
 
 return new Response("Session timer started");
 }
@@ -50,7 +41,7 @@ if (url.pathname === "/cancel") {
 
 await this.ctx.storage.deleteAlarm();
 
-console.log("Session timer annulé");
+console.log("Timer annulé");
 
 return new Response("Session timer cancelled");
 }
@@ -62,7 +53,7 @@ async alarm() {
 
 try {
 
-console.log("Alarme déclenchée : retour au QR");
+console.log("Timer terminé : retour QR");
 
 await fullyLoadURL(
 this.env,
@@ -83,7 +74,7 @@ error
 
 
 // ======================================================
-// FONCTION FULLY KIOSK
+// FULLY KIOSK
 // ======================================================
 
 async function fullyLoadURL(env, url) {
@@ -93,9 +84,7 @@ const apiKey = env.FULLY_API_KEY;
 const deviceId = env.FULLY_DEVICE_ID;
 
 if (!email || !apiKey || !deviceId) {
-throw new Error(
-"Secrets Fully manquants"
-);
+throw new Error("Secrets Fully manquants");
 }
 
 const response = await fetch(
@@ -119,13 +108,9 @@ parameter: url
 
 const text = await response.text();
 
-console.log(
-"Réponse Fully :",
-text
-);
+console.log("Réponse Fully :", text);
 
 if (!response.ok) {
-
 throw new Error(
 `Erreur Fully ${response.status}: ${text}`
 );
@@ -136,7 +121,7 @@ return text;
 
 
 // ======================================================
-// SUMUP : CRÉATION DU CHECKOUT
+// SUMUP : CRÉER UN CHECKOUT
 // ======================================================
 
 async function createSumUpCheckout(
@@ -159,6 +144,7 @@ headers: {
 },
 
 body: JSON.stringify({
+
 checkout_reference:
 reference,
 
@@ -171,8 +157,13 @@ currency:
 merchant_code:
 env.SUMUP_MERCHANT_CODE,
 
+hosted_checkout: {
+enabled: true
+},
+
 return_url:
 "https://borne-gaming.eloprati60.workers.dev/webhook"
+
 })
 }
 );
@@ -192,12 +183,19 @@ throw new Error(
 );
 }
 
+if (!data.hosted_checkout_url) {
+
+throw new Error(
+"SumUp n'a pas retourné hosted_checkout_url"
+);
+}
+
 return data;
 }
 
 
 // ======================================================
-// SUMUP : VÉRIFICATION DU PAIEMENT
+// SUMUP : VÉRIFIER LE CHECKOUT
 // ======================================================
 
 async function getSumUpCheckout(
@@ -237,7 +235,7 @@ return data;
 
 
 // ======================================================
-// ROUTES WORKER
+// WORKER
 // ======================================================
 
 export default {
@@ -249,21 +247,13 @@ new URL(request.url);
 
 
 // ==================================================
-// PAGE PRINCIPALE
+// TEST WORKER
 // ==================================================
 
 if (url.pathname === "/") {
 
 return new Response(
-"BORNE GAMING OK",
-{
-status: 200,
-
-headers: {
-"Content-Type":
-"text/plain; charset=utf-8"
-}
-}
+"BORNE GAMING OK"
 );
 }
 
@@ -287,7 +277,7 @@ reference
 );
 
 return Response.redirect(
-checkout.checkout_url,
+checkout.hosted_checkout_url,
 303
 );
 
@@ -306,7 +296,7 @@ status: 500
 
 
 // ==================================================
-// CRÉATION DU PAIEMENT
+// CRÉER UN PAIEMENT
 //
 // /pay?borne=001&jeu=fc26&duree=20
 // ==================================================
@@ -327,8 +317,6 @@ url.searchParams.get("duree")
 );
 
 
-// Vérification borne
-
 if (!borne) {
 
 return new Response(
@@ -340,8 +328,6 @@ status: 400
 }
 
 
-// Vérification jeu
-
 if (!GAMES[jeu]) {
 
 return new Response(
@@ -352,8 +338,6 @@ status: 400
 );
 }
 
-
-// Vérification durée
 
 if (!PRICES[duree]) {
 
@@ -383,7 +367,7 @@ reference
 
 
 return Response.redirect(
-checkout.checkout_url,
+checkout.hosted_checkout_url,
 303
 );
 
@@ -402,7 +386,7 @@ status: 500
 
 
 // ==================================================
-// WEBHOOK / RETOUR SUMUP
+// WEBHOOK SUMUP
 // ==================================================
 
 if (url.pathname === "/webhook") {
@@ -414,9 +398,6 @@ url.searchParams.get(
 "checkout_id"
 );
 
-
-// Tentative récupération depuis
-// le corps JSON
 
 if (!checkoutId) {
 
@@ -431,8 +412,7 @@ body.id ||
 null;
 
 } catch (_) {
-
-// Aucun JSON
+// Pas de JSON
 }
 }
 
@@ -448,9 +428,7 @@ status: 400
 }
 
 
-// ----------------------------------------------
-// Vérification du paiement auprès de SumUp
-// ----------------------------------------------
+// Vérification côté serveur
 
 const checkout =
 await getSumUpCheckout(
@@ -459,15 +437,9 @@ checkoutId
 );
 
 
-console.log(
-"Checkout vérifié :",
-JSON.stringify(checkout)
-);
-
-
-// ----------------------------------------------
-// Vérification statut
-// ----------------------------------------------
+// ------------------------------------------------
+// STATUT DU PAIEMENT
+// ------------------------------------------------
 
 const status =
 String(
@@ -489,9 +461,9 @@ status: 400
 }
 
 
-// ----------------------------------------------
-// Récupération référence
-// ----------------------------------------------
+// ------------------------------------------------
+// RÉFÉRENCE
+// ------------------------------------------------
 
 const reference =
 checkout.checkout_reference ||
@@ -526,10 +498,6 @@ const duree =
 Number(match[3]);
 
 
-// ----------------------------------------------
-// Vérification jeu
-// ----------------------------------------------
-
 if (!GAMES[jeu]) {
 
 return new Response(
@@ -540,10 +508,6 @@ status: 400
 );
 }
 
-
-// ----------------------------------------------
-// Vérification durée
-// ----------------------------------------------
 
 if (!PRICES[duree]) {
 
@@ -556,28 +520,24 @@ status: 400
 }
 
 
-// ----------------------------------------------
-// LANCEMENT DU JEU
-// ----------------------------------------------
-
-const gameURL =
-GAMES[jeu].url;
-
+// ------------------------------------------------
+// LANCER FC26
+// ------------------------------------------------
 
 await fullyLoadURL(
 env,
-gameURL
+GAMES[jeu].url
 );
 
 
 console.log(
-`Jeu lancé : ${jeu} sur borne ${borne}`
+`Jeu ${jeu} lancé sur borne ${borne}`
 );
 
 
-// ----------------------------------------------
-// DÉMARRAGE DU TIMER
-// ----------------------------------------------
+// ------------------------------------------------
+// DÉMARRER LE TIMER
+// ------------------------------------------------
 
 const timerNamespace =
 env.SESSION_TIMER;
@@ -611,7 +571,7 @@ console.log(
 
 
 return new Response(
-"Paiement confirmé - jeu lancé - minuteur démarré",
+"Paiement confirmé - jeu lancé - timer démarré",
 {
 status: 200
 }
@@ -635,7 +595,7 @@ status: 500
 
 
 // ==================================================
-// TEST DIRECT FULLY
+// TEST FULLY
 // ==================================================
 
 if (url.pathname === "/test-fully") {
