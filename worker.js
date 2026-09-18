@@ -260,37 +260,39 @@ export class SessionTimer extends DurableObject {
 
 async fetch(request) {
 
-const url =
-new URL(request.url);
-
+const url = new URL(request.url);
 
 // ----------------------------------------------
-// START TIMER
+// DEMARRER LE TIMER
 // ----------------------------------------------
 
 if (url.pathname === "/start") {
 
-// TEST :
-// 1 minute
-//
-// On passera à 20 minutes après validation.
+const duree =
+Number(url.searchParams.get("duree"));
 
-await this.ctx.storage.setAlarm(
-Date.now() + 60 * 1000
-);
-
-console.log(
-"TIMER START : 1 minute"
-);
-
+if (!duree || duree <= 0) {
 return new Response(
-"Timer started"
+"Durée invalide",
+{ status: 400 }
 );
 }
 
+await this.ctx.storage.setAlarm(
+Date.now() + duree * 60 * 1000
+);
+
+console.log(
+`TIMER START : ${duree} minutes`
+);
+
+return new Response(
+`Timer démarré pour ${duree} minutes`
+);
+}
 
 // ----------------------------------------------
-// CANCEL TIMER
+// ANNULER LE TIMER
 // ----------------------------------------------
 
 if (url.pathname === "/cancel") {
@@ -306,15 +308,13 @@ return new Response(
 );
 }
 
-
 return new Response(
 "SessionTimer OK"
 );
 }
 
-
 // ----------------------------------------------
-// ALARME
+// FIN DU TIMER
 // ----------------------------------------------
 
 async alarm() {
@@ -343,7 +343,6 @@ error.message
 }
 }
 }
-
 
 // ======================================================
 // WORKER
