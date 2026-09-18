@@ -847,7 +847,7 @@ env.SESSION_TIMER.getByName(
 
 
 await timer.fetch(
-"https://session/start",
+`https://session/start?duree=${duree}`,
 {
 method: "POST"
 }
