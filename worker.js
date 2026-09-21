@@ -355,6 +355,43 @@ async fetch(request, env) {
 const url =
 new URL(request.url);
 
+// ==================================================
+// TEST OVERLAY
+// ==================================================
+
+if (url.pathname === "/test-overlay") {
+
+try {
+
+const result =
+await fullyCommand(
+env,
+"setOverlayMessage",
+{
+text: "⏱ 20:00"
+}
+);
+
+return new Response(
+"Overlay envoyé.\n\n" +
+result
+);
+
+} catch (error) {
+
+console.error(
+"TEST OVERLAY ERROR :",
+error
+);
+
+return new Response(
+`Erreur overlay : ${error.message}`,
+{
+status: 500
+}
+);
+}
+}
 
 // ==================================================
 // TEST FULLY
