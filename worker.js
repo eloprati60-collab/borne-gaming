@@ -478,6 +478,138 @@ status: 500
 }
 }
 
+// ==================================================
+// PAGE TIMER
+// ==================================================
+
+if (url.pathname === "/timer") {
+
+const duree =
+Number(
+url.searchParams.get("duree")
+);
+
+if (!duree || duree <= 0) {
+return new Response(
+"Durée invalide",
+{
+status: 400
+}
+);
+}
+
+const html = `
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport"
+content="width=device-width, initial-scale=1.0">
+
+<title>Temps restant</title>
+
+<style>
+html, body {
+margin: 0;
+padding: 0;
+width: 100%;
+height: 100%;
+background: transparent;
+overflow: hidden;
+font-family: Arial, sans-serif;
+}
+
+#timer {
+position: fixed;
+top: 20px;
+right: 20px;
+
+padding: 12px 20px;
+
+background: rgba(0,0,0,0.75);
+color: white;
+
+border-radius: 12px;
+
+font-size: 28px;
+font-weight: bold;
+
+z-index: 9999;
+}
+</style>
+</head>
+
+<body>
+
+<div id="timer">
+${duree}:00
+</div>
+
+<script>
+
+const dureeMinutes = ${duree};
+
+const fin =
+Date.now() +
+dureeMinutes * 60 * 1000;
+
+function afficherTimer() {
+
+const restant =
+Math.max(
+0,
+fin - Date.now()
+);
+
+const secondes =
+Math.floor(
+restant / 1000
+);
+
+const minutes =
+Math.floor(
+secondes / 60
+);
+
+const sec =
+secondes % 60;
+
+document.getElementById("timer")
+.textContent =
+"⏱ " +
+minutes +
+":" +
+String(sec).padStart(2, "0");
+
+if (restant <= 0) {
+clearInterval(interval);
+}
+}
+
+afficherTimer();
+
+const interval =
+setInterval(
+afficherTimer,
+1000
+);
+
+</script>
+
+</body>
+</html>
+`;
+
+return new Response(
+html,
+{
+headers: {
+"Content-Type":
+"text/html; charset=UTF-8"
+}
+}
+);
+}
 
 // ==================================================
 // HOME
