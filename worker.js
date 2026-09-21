@@ -1004,17 +1004,7 @@ console.log(
 "JEU LANCE"
 );
 
-await fullyCommand(
-env,
-"setOverlayMessage",
-{
-text: `⏱ ${duree}:00`
-}
-);
 
-console.log(
-"TIMER AFFICHAGE ENVOYE"
-);
 // ----------------------------------------------
 // TIMER
 // ----------------------------------------------
