@@ -7,8 +7,103 @@ const QR_URL =
 
 const GAMES = {
   fc26: {
-    url:
-      "https://www.xbox.com/fr-FR/play/launch/ea-sports-fc-26-pour-xbox-series-x%7Cs/9P9FTXPKQ35P"
+    name: "FC 26",
+    url: "https://www.xbox.com/fr-FR/play/launch/ea-sports-fc-26-pour-xbox-series-x%7Cs/9P9FTXPKQ35P"
+  },
+
+  ufc5: {
+    name: "UFC 5",
+    url: "https://www.xbox.com/fr-FR/play/launch/ufc-5/9NH8K4B707H0"
+  },
+
+  forza6: {
+    name: "Forza Horizon 6",
+    url: "https://www.xbox.com/fr-FR/play/launch/forza-horizon-6/9NR1R1XWLCNB"
+  },
+
+  fortnite: {
+    name: "Fortnite",
+    url: "https://www.xbox.com/fr-FR/play/launch/fortnite/BT5P2X999VH2"
+  },
+
+  codmw3: {
+    name: "Call of Duty MW3",
+    url: "https://www.xbox.com/fr-FR/play/launch/call-of-duty-modern-warfare-iii/9PMFDKG5F9R7"
+  },
+
+  nfsunbound: {
+    name: "Need for Speed Unbound",
+    url: "https://www.xbox.com/fr-FR/play/launch/need-for-speed-unbound/9PP837L3Q75D"
+  },
+
+  codbo7: {
+    name: "Call of Duty Black Ops 7",
+    url: "https://www.xbox.com/fr-FR/play/launch/call-of-duty-black-ops-7---pack-cross-gen/9N8KMNW6942X"
+  },
+
+  crew: {
+    name: "The Crew Motorfest",
+    url: "https://www.xbox.com/fr-FR/play/launch/the-crew-motorfest---xbox-series-x%7Cs/9NTB0ZG811GR"
+  },
+
+  watchdogs2: {
+    name: "Watch Dogs 2",
+    url: "https://www.xbox.com/fr-FR/play/launch/watch-dogs2/BSXLFN5QQZSC"
+  },
+
+  nfsheat: {
+    name: "Need for Speed Heat",
+    url: "https://www.xbox.com/fr-FR/play/launch/need-for-speed-heat/BRZZLBF5T245"
+  },
+
+  goals: {
+    name: "GOALS",
+    url: "https://www.xbox.com/fr-FR/play/launch/goals/9PF2ZS4XB4JH"
+  },
+
+  rematch: {
+    name: "REMATCH",
+    url: "https://www.xbox.com/fr-FR/play/launch/rematch/9N5K7HWXL4Q6"
+  },
+
+  uno: {
+    name: "UNO",
+    url: "https://www.xbox.com/fr-FR/play/launch/uno/BNSDHDK45KBR"
+  },
+
+  monopoly: {
+    name: "Monopoly",
+    url: "https://www.xbox.com/fr-FR/play/launch/new-monopoly/9P8H220G3S4P"
+  },
+
+  undisputed: {
+    name: "Undisputed",
+    url: "https://www.xbox.com/fr-FR/play/launch/undisputed/9NQ6Z171XZX8"
+  },
+
+  batman: {
+    name: "Batman Arkham Knight",
+    url: "https://www.xbox.com/fr-FR/play/launch/batman-arkham-knight/BSLX1RNXR6H7"
+  },
+
+  blackflag: {
+    name: "Assassin's Creed IV Black Flag",
+    url: "https://www.xbox.com/fr-FR/play/launch/assassin's-creed-iv-black-flag/BRKMHZX1RCF2"
+  },
+
+  xenoverse2: {
+    name: "Dragon Ball Xenoverse 2",
+    url: "https://www.xbox.com/fr-FR/play/launch/dragon-ball-xenoverse-2/BX03760D0QGN"
+  },
+
+  ridersrepublic: {
+    name: "Riders Republic",
+    url: "https://www.xbox.com/fr-FR/play/launch/riders-republic-premium-edition/9NB10N6MFQSR"
+  },
+
+  flightsimulator: {
+    name: "Microsoft Flight Simulator 2024",
+    url: "https://www.xbox.com/fr-FR/play/launch/microsoft-flight-simulator-2024/9P38D19T7LRV"
   }
 };
 
