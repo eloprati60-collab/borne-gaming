@@ -2,18 +2,10 @@
 "name": "borne-gaming",
 "main": "worker.js",
 "compatibility_date": "2026-09-17",
-"durable_objects": {
-"bindings": [
-{
-"name": "SESSION_TIMER",
-"class_name": "SessionTimer"
-}
-]
-},
 "exports": {
 "SessionTimer": {
 "type": "durable-object",
-"storage": "sqlite"
+"state": "deleted"
 }
 }
 }
