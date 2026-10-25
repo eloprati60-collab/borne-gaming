@@ -3,7 +3,7 @@ import { DurableObject } from "cloudflare:workers";
 const FULLY_API_URL = "https://api.fully-kiosk.com/remote/";
 
 const QR_URL =
-  "https://testsrcodejeux.carrd.co/?borne=001";
+  "https://testsrcodejeux.carrd.co/?borne=001"; 
 
 const GAMES = {
   fc26: {
