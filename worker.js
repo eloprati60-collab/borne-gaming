@@ -364,6 +364,38 @@ return new Response(
 );
 }
 }
+ // TEST GRATUIT : lancer Shadow pendant 2 minutes
+    if (url.pathname === "/test-gratuit") {
+      try {
+        // Lancer Shadow sur la Fire TV
+        await fullyCommand(env, "startApplication", {
+          package: SHADOW_PACKAGE
+        });
+
+        // Démarrer le minuteur de test de 2 minutes
+        const timer = env.SESSION_TIMER.getByName("borne-001");
+
+        const timerResponse = await timer.fetch(
+          "https://session/start?duree=20",
+          { method: "POST" }
+        );
+
+        if (!timerResponse.ok) {
+          throw new Error(await timerResponse.text());
+        }
+
+        return new Response(
+          "Test gratuit lancé : Shadow démarré, minuteur de 20 minutes."
+        );
+      } catch (error) {
+        console.error("ERREUR TEST GRATUIT :", error.message);
+
+        return new Response(
+          `Échec du test : ${error.message}`,
+          { status: 500 }
+        );
+      }
+    }
 
 // --------------------------------------------------
 // CRÉATION DU PAIEMENT
